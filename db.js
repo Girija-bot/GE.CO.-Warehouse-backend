@@ -2,6 +2,7 @@ const Database = require("better-sqlite3");
 const path = require("path");
 
 const db = new Database(path.join(__dirname, "geco.db"));
+
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
@@ -64,11 +65,44 @@ db.exec(`
   );
 `);
 
-// seed default destinations if empty
-const count = db.prepare("SELECT COUNT(*) as c FROM destinations").get().c;
-if (count === 0) {
-  const insert = db.prepare("INSERT INTO destinations (name) VALUES (?)");
-  ["Ospedale Papardo", "Main Warehouse", "Farmacia", "Clinica A", "Clinica B"].forEach((d) => insert.run(d));
+// Seed default destinations if empty
+const destinationCount =
+  db.prepare("SELECT COUNT(*) as c FROM destinations").get().c;
+
+if (destinationCount === 0) {
+  const insert = db.prepare(
+    "INSERT INTO destinations (name) VALUES (?)"
+  );
+
+  [
+    "Ospedale Papardo",
+    "Main Warehouse",
+    "Farmacia",
+    "Clinica A",
+    "Clinica B"
+  ].forEach((d) => insert.run(d));
+}
+
+// Seed default admin user if the database has no users
+// Credentials are taken from environment variables on Render.
+const userCount =
+  db.prepare("SELECT COUNT(*) as c FROM users").get().c;
+
+const adminUsername = process.env.ADMIN_USERNAME;
+const adminPassword = process.env.ADMIN_PASSWORD;
+
+if (userCount === 0 && adminUsername && adminPassword) {
+  db.prepare(`
+    INSERT INTO users (name, username, password, role)
+    VALUES (?, ?, ?, ?)
+  `).run(
+    "GE.CO. Administrator",
+    adminUsername,
+    adminPassword,
+    "admin"
+  );
+
+  console.log("Default admin user created.");
 }
 
 module.exports = db;
